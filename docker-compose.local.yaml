@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:16.14
+    environment:
+      POSTGRES_DB: ledger
+      POSTGRES_USER: ledger
+      POSTGRES_PASSWORD: devpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./.data/postgres:/var/lib/postgresql/data
+
+#  nats:
+#    image: nats:latest
+#    command: ["-js", "-sd", "/data"]
+#    ports:
+#      - "4222:4222"
+#    volumes:
+#      - ./.data/nats:/data

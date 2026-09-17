@@ -1,3 +1,14 @@
 spring:
   application:
     name: ledger
+  datasource:
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    schemas: ledger
+    default-schema: ledger
+    create-schemas: true
+
+logging:
+  level:
+    root: info
+    dev.minkin: debug
