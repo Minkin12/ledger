@@ -4,6 +4,7 @@ import dev.minkin.reconciler.types.BalanceDiscrepancy;
 import dev.minkin.reconciler.types.OrphanedBalance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Isolation;
@@ -22,20 +23,20 @@ public class Reconciler {
         this.reconciliationRepository = reconciliationRepository;
     }
 
-    @Scheduled(fixedDelay = 60000)
+    @Scheduled(fixedDelayString = "${dev.minkin.ledger.reconciler.fixed-delay-ms:60000}", initialDelay = 10000)
     @Transactional(isolation = Isolation.REPEATABLE_READ)
-    public void reconcile(){
+    public void reconcile() {
         boolean balancesEven = areAccountBalancesEven();
         boolean globalEven = areGlobalBalancesEven();
         boolean noOrphans = noOrphanedBalances();
-        if (balancesEven && globalEven && noOrphans){
+        if (balancesEven && globalEven && noOrphans) {
             log.info("Reconciliation found no issues");
         }
     }
 
     private boolean areAccountBalancesEven() {
         List<BalanceDiscrepancy> balanceDiscrepancies = reconciliationRepository.findBalanceDiscrepancies();
-        if (balanceDiscrepancies.isEmpty()){
+        if (balanceDiscrepancies.isEmpty()) {
             return true;
         } else {
             log.warn("Account balance discrepancies are not empty. Affected accounts: {}", balanceDiscrepancies);
@@ -45,7 +46,7 @@ public class Reconciler {
 
     private boolean areGlobalBalancesEven() {
         long globalSum = reconciliationRepository.computeGlobalBalanceSum();
-        if (globalSum == 0){
+        if (globalSum == 0) {
             return true;
         } else {
             log.warn("Global sum is not 0, is: {}", globalSum);
@@ -55,7 +56,7 @@ public class Reconciler {
 
     private boolean noOrphanedBalances() {
         List<OrphanedBalance> orphanedBalances = reconciliationRepository.findOrphanedBalances();
-        if (orphanedBalances.isEmpty()){
+        if (orphanedBalances.isEmpty()) {
             return true;
         } else {
             log.warn("Orphaned balances are not empty. Affected balances: {}", orphanedBalances);

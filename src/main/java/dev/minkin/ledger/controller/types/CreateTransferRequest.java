@@ -1,0 +1,14 @@
+package dev.minkin.ledger.controller.types;
+
+import dev.minkin.ledger.types.CreateTransferRequestEntryLine;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
+
+import java.util.List;
+
+public record CreateTransferRequest(
+        @NotBlank @Size(max = 64) String reason,
+        @NotEmpty @Size(min = 2, max = 1000) List< @Valid CreateTransferRequestEntryLine> entries) {
+}

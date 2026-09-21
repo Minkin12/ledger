@@ -1,7 +1,7 @@
 package dev.minkin.util;
 
-import dev.minkin.controller.types.CreateTransferRequest;
-import dev.minkin.model.CreateTransferRequestEntryLine;
+import dev.minkin.ledger.controller.types.CreateTransferRequest;
+import dev.minkin.ledger.types.CreateTransferRequestEntryLine;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;

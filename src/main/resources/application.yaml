@@ -7,6 +7,26 @@ spring:
     schemas: ledger
     default-schema: ledger
     create-schemas: true
+dev.minkin.ledger:
+  poller:
+    batch-size: 500
+  reconciler:
+    fixed-delay-ms: 60000
+  nats:
+    url: nats://localhost:4222
+    stream-name: LEDGER_EVENT_STREAM
+    subjects: ledger.>
+    consumer:
+      entry:
+        subject: ledger.entry.>
+        consumer-name: entry-consumer
+        max-deliver: 5
+        ack-wait: 5s
+    publisher:
+      outbox:
+        batch-size: 500
+        publisher-delay-ms: 60000
+
 
 logging:
   level:

@@ -10,10 +10,10 @@ services:
     volumes:
       - ./.data/postgres:/var/lib/postgresql/data
 
-#  nats:
-#    image: nats:latest
-#    command: ["-js", "-sd", "/data"]
-#    ports:
-#      - "4222:4222"
-#    volumes:
-#      - ./.data/nats:/data
+  nats:
+    image: nats:latest
+    command: ["-js", "-sd", "/data"]
+    ports:
+      - "4222:4222"
+    volumes:
+      - ./.data/nats:/data
