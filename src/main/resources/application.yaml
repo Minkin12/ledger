@@ -12,10 +12,13 @@ dev.minkin.ledger:
     batch-size: 500
   reconciler:
     fixed-delay-ms: 60000
+    initial-delay-ms: 10000
   nats:
     url: nats://localhost:4222
     stream-name: LEDGER_EVENT_STREAM
     subjects: ledger.>
+    entry-shard-count: 16
+    stream-max-age: 10d
     consumer:
       entry:
         subject: ledger.entry.>
@@ -25,7 +28,6 @@ dev.minkin.ledger:
     publisher:
       outbox:
         batch-size: 500
-        publisher-delay-ms: 60000
 
 
 logging:

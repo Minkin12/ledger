@@ -17,11 +17,11 @@ import java.util.Set;
 
 @Service
 public class TransferService {
-    private final LedgerRepository ledger;
+    private final TransferRepository transferRepository;
     private final TransferWriter writer;
 
-    public TransferService(LedgerRepository ledgerRepository, TransferWriter writer) {
-        this.ledger = ledgerRepository;
+    public TransferService(TransferRepository transferRepository, TransferWriter writer) {
+        this.transferRepository = transferRepository;
         this.writer = writer;
     }
 
@@ -32,7 +32,7 @@ public class TransferService {
         validateNoDuplicateAccounts(createTransferRequest);
 
         // resolve external ids -> internal
-        Map<String, Long> accounts = ledger.resolveAccounts(externalIdsOf(createTransferRequest));
+        Map<String, Long> accounts = transferRepository.resolveAccounts(externalIdsOf(createTransferRequest));
         requireAllResolved(accounts, createTransferRequest);
 
         byte[] hash = RequestHash.of(createTransferRequest);

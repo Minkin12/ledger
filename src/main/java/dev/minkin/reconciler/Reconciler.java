@@ -4,7 +4,6 @@ import dev.minkin.reconciler.types.BalanceDiscrepancy;
 import dev.minkin.reconciler.types.OrphanedBalance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Isolation;
@@ -23,7 +22,8 @@ public class Reconciler {
         this.reconciliationRepository = reconciliationRepository;
     }
 
-    @Scheduled(fixedDelayString = "${dev.minkin.ledger.reconciler.fixed-delay-ms:60000}", initialDelay = 10000)
+    @Scheduled(fixedDelayString = "${dev.minkin.ledger.reconciler.fixed-delay-ms:60000}",
+            initialDelayString = "${dev.minkin.ledger.reconciler.initial-delay-ms:10000}")
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     public void reconcile() {
         boolean balancesEven = areAccountBalancesEven();

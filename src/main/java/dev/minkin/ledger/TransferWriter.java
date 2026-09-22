@@ -1,5 +1,6 @@
 package dev.minkin.ledger;
 
+import dev.minkin.configuration.properties.NatsProperties;
 import dev.minkin.ledger.controller.exceptions.IdempotencyConflictException;
 import dev.minkin.ledger.controller.exceptions.TransferNotFoundException;
 import dev.minkin.ledger.controller.types.CreateTransferRequest;
@@ -8,6 +9,7 @@ import dev.minkin.ledger.controller.types.TransferResponse;
 import dev.minkin.ledger.types.ResolvedEntryDto;
 import dev.minkin.ledger.types.TransferDto;
 import dev.minkin.ledger.types.CreateTransferRequestEntryLine;
+import dev.minkin.ledger.types.InsertedEntry;
 import dev.minkin.ledger.types.InsertedTransfer;
 import dev.minkin.ledger.types.ResolvedEntry;
 import dev.minkin.ledger.types.events.EntryEvent;
@@ -26,10 +28,14 @@ public class TransferWriter {
 
     private static final Logger log = LoggerFactory.getLogger(TransferWriter.class);
 
-    private final LedgerRepository ledger;
+    private final TransferRepository transferRepository;
+    private final OutboxRepository outbox;
+    private final int shardCount;
 
-    public TransferWriter(LedgerRepository ledger) {
-        this.ledger = ledger;
+    public TransferWriter(TransferRepository transferRepository, OutboxRepository outbox, NatsProperties natsProperties) {
+        this.transferRepository = transferRepository;
+        this.outbox = outbox;
+        this.shardCount = natsProperties.entryShardCount();
     }
 
     @Transactional
@@ -37,36 +43,35 @@ public class TransferWriter {
                                   CreateTransferRequest req,
                                   Map<String, Long> accounts) {
 
-        InsertedTransfer insertedTransfer = ledger.insertTransfer(key, hash, req.reason());
+        InsertedTransfer insertedTransfer = transferRepository.insertTransfer(key, hash, req.reason());
 
-        List<ResolvedEntry> resolvedEntries = req.entries().stream()
-                .map(l -> new ResolvedEntry(accounts.get(l.accountId()), l.accountId(), l.amount()))
-                .toList();
+        List<ResolvedEntry> resolvedEntries = new ArrayList<>();
+        for (CreateTransferRequestEntryLine line : req.entries()) {
+            resolvedEntries.add(new ResolvedEntry(accounts.get(line.accountId()), line.accountId(), line.amount()));
+        }
 
-        List<Long> entryIds = ledger.insertEntries(insertedTransfer.id(), resolvedEntries);
+        List<InsertedEntry> insertedEntries = transferRepository.insertEntries(insertedTransfer.id(), resolvedEntries);
 
-        for (int i = 0; i < resolvedEntries.size(); i++){
-            // This works since entries are returned in order
-            ResolvedEntry resolvedEntry = resolvedEntries.get(i);
-            Long entryId = entryIds.get(i);
+        for (InsertedEntry insertedEntry : insertedEntries) {
+            ResolvedEntry resolvedEntry = insertedEntry.entry();
 
-            Long shard = resolvedEntry.accountId() % 16;
-            String resolvedSubject = String.format("ledger.entry.%s.%d", shard, resolvedEntry.accountId());
+            long shard = resolvedEntry.internalAccountId() % shardCount;
+            String resolvedSubject = String.format("ledger.entry.%s.%d", shard, resolvedEntry.internalAccountId());
 
-            ledger.insertOutbox(UUID.randomUUID(), resolvedSubject, new EntryEvent(
-                    resolvedEntry.accountId(),
-                    entryId,
+            outbox.insertOutbox(UUID.randomUUID(), resolvedSubject, new EntryEvent(
+                    resolvedEntry.internalAccountId(),
+                    insertedEntry.id(),
                     resolvedEntry.amount(),
                     EventType.ENTRY_CREATED.name(),
                     1));
         }
 
-        return buildResponseForWrite(insertedTransfer, entryIds, req);
+        return buildResponseForWrite(insertedTransfer, insertedEntries, req);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public TransferResponse replay(String key, byte[] hash) {
-        Optional<TransferDto> existing = ledger.findByIdempotencyKey(key);
+        Optional<TransferDto> existing = transferRepository.findByIdempotencyKey(key);
         if (existing.isPresent()) {
             TransferDto transferDto = existing.get();
             if (!MessageDigest.isEqual(transferDto.requestHash(), hash)) {
@@ -78,19 +83,17 @@ public class TransferWriter {
         return buildResponseForReplay(existing.get());
     }
 
-    private TransferResponse buildResponseForWrite(InsertedTransfer insertedTransfer, List<Long> entryIds, CreateTransferRequest req) {
+    private TransferResponse buildResponseForWrite(InsertedTransfer insertedTransfer, List<InsertedEntry> insertedEntries, CreateTransferRequest req) {
         List<EntryResponse> entries = new ArrayList<>();
-        for (int i = 0; i < entryIds.size(); i++) {
-            CreateTransferRequestEntryLine createTransferRequestEntryLine = req.entries().get(i);
-            Long entryId = entryIds.get(i);
-
-            entries.add(new EntryResponse(entryId, createTransferRequestEntryLine.accountId(), createTransferRequestEntryLine.amount()));
+        for (InsertedEntry insertedEntry : insertedEntries) {
+            ResolvedEntry resolvedEntry = insertedEntry.entry();
+            entries.add(new EntryResponse(insertedEntry.id(), resolvedEntry.externalId(), resolvedEntry.amount()));
         }
-        return new TransferResponse(insertedTransfer.id(),req.reason(), insertedTransfer.createdAt(), entries);
+        return new TransferResponse(insertedTransfer.id(), req.reason(), insertedTransfer.createdAt(), entries);
     }
 
     private TransferResponse buildResponseForReplay(TransferDto transferDto) {
-        List<ResolvedEntryDto> resolvedEntryDtoList = ledger.findResolvedEntriesByTransferId(transferDto.id());
+        List<ResolvedEntryDto> resolvedEntryDtoList = transferRepository.findResolvedEntriesByTransferId(transferDto.id());
         List<EntryResponse> entries = new ArrayList<>();
         for (ResolvedEntryDto resolvedEntryDto : resolvedEntryDtoList) {
             entries.add(new EntryResponse(resolvedEntryDto.entryId(), resolvedEntryDto.externalId(), resolvedEntryDto.amount()));

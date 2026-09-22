@@ -8,7 +8,6 @@ import io.nats.client.api.StreamConfiguration;
 import io.nats.client.api.StreamInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -19,10 +18,18 @@ import java.time.Duration;
 public class NatsConfiguration {
     private static final Logger log = LoggerFactory.getLogger(NatsConfiguration.class);
 
+    private static final int STREAM_NAME_ALREADY_IN_USE_ERROR_CODE = 10058;
+
     private final String natsUrl;
+    private final String streamName;
+    private final String subjects;
+    private final Duration streamMaxAge;
 
     public NatsConfiguration(NatsProperties natsProperties) {
         this.natsUrl = natsProperties.url();
+        this.streamName = natsProperties.streamName();
+        this.subjects = natsProperties.subjects();
+        this.streamMaxAge = natsProperties.streamMaxAge();
     }
     @Bean
     public Connection natsConnection() throws IOException, InterruptedException {
@@ -48,17 +55,17 @@ public class NatsConfiguration {
     public StreamInfo ledgerEventStream(JetStreamManagement jsm) throws Exception {
 
         StreamConfiguration streamConfig = StreamConfiguration.builder()
-                .name("LEDGER_EVENT_STREAM")
-                .subjects("ledger.>")
+                .name(streamName)
+                .subjects(subjects)
                 .storageType(StorageType.File)
                 .retentionPolicy(RetentionPolicy.Limits)
-                .maxAge(Duration.ofDays(10))
+                .maxAge(streamMaxAge)
                 .build();
 
         try {
             return jsm.addStream(streamConfig);
         } catch (JetStreamApiException e) {
-            if (e.getApiErrorCode() == 10058) {
+            if (e.getApiErrorCode() == STREAM_NAME_ALREADY_IN_USE_ERROR_CODE) {
                 try {
                     return jsm.updateStream(streamConfig);
                 } catch (JetStreamApiException updateError) {

@@ -12,6 +12,8 @@ public record NatsProperties(
         @DefaultValue("nats://localhost:4222") String url,
         String streamName,
         String subjects,
+        @DefaultValue("16") Integer entryShardCount,
+        @DefaultValue("10d") Duration streamMaxAge,
         Map<String, ConsumerProperties> consumer,
         Map<String, PublisherProperties> publisher
 ) {
@@ -21,6 +23,5 @@ public record NatsProperties(
             @DefaultValue("5") int maxDeliver,
             @DefaultValue("30s") Duration ackWait
     ) {}
-    public record PublisherProperties(@DefaultValue("500") Integer batchSize,
-                                      Long publisherDelayMs) {}
+    public record PublisherProperties(@DefaultValue("500") Integer batchSize) {}
 }

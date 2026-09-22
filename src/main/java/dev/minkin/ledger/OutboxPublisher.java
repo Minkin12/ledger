@@ -10,7 +10,6 @@ import io.nats.client.impl.Headers;
 import io.nats.client.impl.NatsMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
@@ -26,16 +25,16 @@ public class OutboxPublisher {
     private static final Logger log = LoggerFactory.getLogger(OutboxPublisher.class);
 
     private final JetStream jetStream;
-    private final LedgerRepository ledgerRepository;
+    private final OutboxRepository outboxRepository;
     private final NatsProperties.PublisherProperties publisherProperties;
 
 
     public OutboxPublisher(JetStream jetStream,
-                           LedgerRepository ledgerRepository,
+                           OutboxRepository outboxRepository,
                            NatsProperties natsProperties
                            ) {
         this.jetStream = jetStream;
-        this.ledgerRepository = ledgerRepository;
+        this.outboxRepository = outboxRepository;
         this.publisherProperties = natsProperties.publisher().get("outbox");
     }
 
@@ -45,7 +44,7 @@ public class OutboxPublisher {
         List<OutboxDto> batch;
         List<UUID> eventIds = new ArrayList<>();
         do {
-            batch = ledgerRepository.getOutboxEntries(publisherProperties.batchSize());
+            batch = outboxRepository.getOutboxEntries(publisherProperties.batchSize());
             for (OutboxDto entry : batch) {
                 PublishAck pa = publish(entry);
                 if (pa.isDuplicate()){
@@ -54,8 +53,9 @@ public class OutboxPublisher {
                 eventIds.add(entry.eventId());
             }
             if (!eventIds.isEmpty()) {
-                ledgerRepository.batchUpdateOutboxPublishedTime(eventIds);
+                outboxRepository.batchUpdateOutboxPublishedTime(eventIds);
             }
+            eventIds.clear();
         } while (batch.size() == publisherProperties.batchSize());
 
 

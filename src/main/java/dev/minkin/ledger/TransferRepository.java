@@ -1,28 +1,22 @@
 package dev.minkin.ledger;
 
 import dev.minkin.ledger.types.*;
-import dev.minkin.ledger.types.events.Event;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
-import tools.jackson.databind.ObjectMapper;
 
-import java.time.OffsetDateTime;
 import java.util.*;
 
 @Repository
-public class LedgerRepository {
-    private static final Logger log = LoggerFactory.getLogger(LedgerRepository.class);
+public class TransferRepository {
+    private static final Logger log = LoggerFactory.getLogger(TransferRepository.class);
 
     private final JdbcClient db;
-    private final ObjectMapper objectMapper;
 
-    public LedgerRepository(JdbcClient db, ObjectMapper objectMapper) {
+    public TransferRepository(JdbcClient db) {
         this.db = db;
-        this.objectMapper = objectMapper;
     }
-
 
     public Map<String, Long> resolveAccounts(Set<String> accountIds) {
         if (accountIds == null || accountIds.isEmpty()) {
@@ -54,32 +48,14 @@ public class LedgerRepository {
                 .single();
     }
 
-    public List<Long> insertEntries(long transferId, List<ResolvedEntry> entries) {
-        List<Long> entryIds = new ArrayList<>();
+    public List<InsertedEntry> insertEntries(long transferId, List<ResolvedEntry> entries) {
+        List<InsertedEntry> insertedEntries = new ArrayList<>();
         // will be fine for a few entries which it usually would be but could use optimization
         for (ResolvedEntry entry : entries) {
-            entryIds.add(insertEntry(transferId, entry));
+            long id = insertEntry(transferId, entry);
+            insertedEntries.add(new InsertedEntry(id, entry));
         }
-        return entryIds;
-    }
-
-    public void insertOutbox(UUID eventId, String subject, Event event) {
-        String payload = objectMapper.writeValueAsString(event);
-        this.db.sql("""
-                        insert into outbox (event_id, subject, payload)
-                        values (:eventId, :subject, :payload)
-                        """)
-                .param("eventId", eventId)
-                .param("subject", subject)
-                .param("payload", payload)
-                .update();
-    }
-
-    public void batchUpdateOutboxPublishedTime(List<UUID> eventIds){
-        this.db.sql("update outbox set published_at = now() where event_id in (:eventIds)")
-                .param("eventIds", eventIds)
-                .update();
-
+        return insertedEntries;
     }
 
     public Optional<TransferDto> findByIdempotencyKey(String key) {
@@ -110,17 +86,6 @@ public class LedgerRepository {
                 .list();
     }
 
-    public List<OutboxDto> getOutboxEntries(long batchSize) {
-        return this.db.sql("""
-                with unprocessed as (select * from outbox where published_at is null order by id)
-                select * from unprocessed order by id
-                limit :batchSize
-                """)
-                .param("batchSize", batchSize)
-                .query(OutboxDto.class)
-                .list();
-    }
-
     private long insertEntry(long transferId, ResolvedEntry entry) {
         return db.sql("""
                         insert into entry (transfer_id, account_id, amount)
@@ -128,7 +93,7 @@ public class LedgerRepository {
                         returning id
                         """)
                 .param("transferId", transferId)
-                .param("accountId", entry.accountId())
+                .param("accountId", entry.internalAccountId())
                 .param("amount", entry.amount())
                 .query(Long.class)
                 .single();

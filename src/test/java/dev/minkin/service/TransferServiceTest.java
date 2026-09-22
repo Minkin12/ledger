@@ -6,7 +6,7 @@ import dev.minkin.ledger.controller.exceptions.UnknownAccountException;
 import dev.minkin.ledger.controller.exceptions.ZeroAmountException;
 import dev.minkin.ledger.controller.types.CreateTransferRequest;
 import dev.minkin.ledger.types.CreateTransferRequestEntryLine;
-import dev.minkin.ledger.LedgerRepository;
+import dev.minkin.ledger.TransferRepository;
 import dev.minkin.ledger.TransferService;
 import dev.minkin.ledger.TransferWriter;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,15 +24,15 @@ import static org.mockito.Mockito.when;
 
 class TransferServiceTest {
 
-    private LedgerRepository ledgerRepository;
+    private TransferRepository transferRepository;
     private TransferWriter transferWriter;
     private TransferService service;
 
     @BeforeEach
     void setUp() {
-        ledgerRepository = Mockito.mock(LedgerRepository.class);
+        transferRepository = Mockito.mock(TransferRepository.class);
         transferWriter = Mockito.mock(TransferWriter.class);
-        service = new TransferService(ledgerRepository, transferWriter);
+        service = new TransferService(transferRepository, transferWriter);
     }
 
     @Test
@@ -76,7 +76,7 @@ class TransferServiceTest {
 
     @Test
     void createTransfer_shouldRejectUnknownAccounts() {
-        when(ledgerRepository.resolveAccounts(anySet())).thenReturn(Map.of("acct-a", 1L));
+        when(transferRepository.resolveAccounts(anySet())).thenReturn(Map.of("acct-a", 1L));
 
         CreateTransferRequest request = new CreateTransferRequest(
                 "TRANSFER",
@@ -91,7 +91,7 @@ class TransferServiceTest {
 
     @Test
     void createTransfer_shouldAcceptBalancedTransfersForKnownAccounts() {
-        when(ledgerRepository.resolveAccounts(anySet())).thenReturn(Map.of(
+        when(transferRepository.resolveAccounts(anySet())).thenReturn(Map.of(
                 "acct-a", 1L,
                 "acct-b", 2L
         ));
