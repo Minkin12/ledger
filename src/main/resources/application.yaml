@@ -28,6 +28,7 @@ dev.minkin.ledger:
     publisher:
       outbox:
         batch-size: 500
+        publisher-delay-ms: 60000
 
 
 logging:
