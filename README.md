@@ -1,0 +1,3 @@
+An append-only, double-entry ledger built to explore correctness under asynchrony. Transfers are written as immutable entries, with the header, postings, and an outbox row committed in a single Postgres transaction, so there's no dual write. An outbox publisher delivers events to NATS JetStream, where a consumer projects account balances. Delivery is at-least-once; a processed-event guard written in the same transaction as each balance update makes duplicates no-ops. A separate reconciler recomputes balances directly from the log, sharing no code with the projector, and flags any disagreement.
+
+Built with Spring Boot 4, Java 21, Postgres, Flyway, and JDBC (no ORM).
